@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { SessionRequestButton } from './SessionRequestButton'
 import Link from 'next/link'
 
 export default async function LawyerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,10 +21,22 @@ export default async function LawyerProfilePage({ params }: { params: Promise<{ 
 
   if (!lawyer) notFound()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  let userRole: string | null = null
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    userRole = profile?.role || null
+  }
+
   const profile = lawyer.profiles as Record<string, string> | null
   const specs = (lawyer.specializations as string[]) || []
   const langs = (lawyer.languages as string[]) || []
   const fullName = `${profile?.first_name || ''} ${profile?.last_name || ''}`
+  const isMandant = user && userRole === 'mandant'
 
   return (
     <>
@@ -62,13 +75,17 @@ export default async function LawyerProfilePage({ params }: { params: Promise<{ 
             </div>
 
             <div className="mt-6">
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-xl bg-gradient-to-r from-navy-700 to-navy-800 text-white hover:from-navy-800 hover:to-navy-900 shadow-xl shadow-navy-800/25 transition-all duration-200"
-              >
-                Beratung starten
-                <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-              </Link>
+              {isMandant ? (
+                <SessionRequestButton anwaltId={id} />
+              ) : (
+                <Link
+                  href={user ? '#' : '/register'}
+                  className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold rounded-xl bg-gradient-to-r from-navy-700 to-navy-800 text-white hover:from-navy-800 hover:to-navy-900 shadow-xl shadow-navy-800/25 transition-all duration-200"
+                >
+                  Beratung starten
+                  <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                </Link>
+              )}
             </div>
           </Card>
 

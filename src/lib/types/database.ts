@@ -46,6 +46,31 @@ export interface LawyerDocument {
   created_at?: string
 }
 
+export type AvailabilityStatus = 'online' | 'busy' | 'offline'
+export type SessionStatus = 'requested' | 'accepted' | 'active' | 'completed' | 'declined' | 'cancelled'
+export type SessionType = 'chat' | 'video'
+
+export interface ConsultationSession {
+  id: string
+  mandant_id: string
+  anwalt_id: string
+  status: SessionStatus
+  type: SessionType
+  started_at?: string
+  ended_at?: string
+  duration_seconds?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ChatMessage {
+  id: string
+  session_id: string
+  sender_id: string
+  content: string
+  created_at?: string
+}
+
 export interface LawyerWithProfile extends LawyerProfile {
   profile: Profile
 }
