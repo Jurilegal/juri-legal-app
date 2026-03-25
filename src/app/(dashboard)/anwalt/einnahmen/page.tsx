@@ -72,8 +72,24 @@ export default function EinnahmenPage() {
 
   if (loading) return <div className="text-center py-12 text-navy-400">Laden...</div>
 
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
+
+  function downloadCSV() {
+    window.open(`/api/lawyer/consultations/export?month=${currentMonth}&year=${currentYear}`, '_blank')
+  }
+
   return (
     <div className="space-y-8">
+      {/* Export */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-navy-800">Einnahmen</h2>
+        <button onClick={downloadCSV} className="text-sm px-4 py-2 rounded-xl bg-navy-100 text-navy-700 hover:bg-navy-200 cursor-pointer font-medium">
+          📥 CSV Export ({currentMonth}/{currentYear})
+        </button>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
