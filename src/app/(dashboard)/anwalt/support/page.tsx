@@ -48,7 +48,7 @@ export default function SupportPage() {
       message: form.message,
     })
 
-    // Also notify via Supabase Realtime (admins subscribe to this)
+    // Create admin task + send email/realtime notification
     await supabase.from('tasks').insert({
       title: `Support: ${form.subject}`,
       description: form.message,
@@ -57,6 +57,13 @@ export default function SupportPage() {
       related_entity_id: user.id,
       related_entity_type: 'support_ticket',
     })
+
+    // Notify admins via email + realtime
+    await fetch('/api/support/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: form.subject, message: form.message }),
+    }).catch(() => {})
 
     setForm({ subject: '', message: '' })
     setShowForm(false)

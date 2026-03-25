@@ -18,9 +18,12 @@ interface EarningRow {
 
 export default function EinnahmenPage() {
   const supabase = createClient()
+  const now = new Date()
   const [earnings, setEarnings] = useState<EarningRow[]>([])
   const [loading, setLoading] = useState(true)
   const [totals, setTotals] = useState({ gross: 0, fee: 0, net: 0, sessions: 0, minutes: 0 })
+  const [csvMonth, setCsvMonth] = useState(now.getMonth() + 1)
+  const [csvYear, setCsvYear] = useState(now.getFullYear())
 
   useEffect(() => {
     async function load() {
@@ -70,25 +73,33 @@ export default function EinnahmenPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (loading) return <div className="text-center py-12 text-navy-400">Laden...</div>
-
-  const now = new Date()
-  const currentMonth = now.getMonth() + 1
-  const currentYear = now.getFullYear()
+  const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember']
+  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2]
 
   function downloadCSV() {
-    window.open(`/api/lawyer/consultations/export?month=${currentMonth}&year=${currentYear}`, '_blank')
+    window.open(`/api/lawyer/consultations/export?month=${csvMonth}&year=${csvYear}`, '_blank')
   }
+
+  if (loading) return <div className="text-center py-12 text-navy-400">Laden...</div>
 
   return (
     <div className="space-y-8">
       {/* Export */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-xl font-bold text-navy-800">Einnahmen</h2>
-        <button onClick={downloadCSV} className="text-sm px-4 py-2 rounded-xl bg-navy-100 text-navy-700 hover:bg-navy-200 cursor-pointer font-medium">
-          📥 CSV Export ({currentMonth}/{currentYear})
-        </button>
+        <div className="flex items-center gap-2">
+          <select value={csvMonth} onChange={e => setCsvMonth(Number(e.target.value))} className="px-2 py-1.5 rounded-lg border border-navy-200 text-sm">
+            {monthNames.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={csvYear} onChange={e => setCsvYear(Number(e.target.value))} className="px-2 py-1.5 rounded-lg border border-navy-200 text-sm">
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={downloadCSV} className="text-sm px-4 py-2 rounded-xl bg-navy-100 text-navy-700 hover:bg-navy-200 cursor-pointer font-medium">
+            📥 CSV
+          </button>
+        </div>
       </div>
+      <p className="text-sm text-navy-400 -mt-4">⚠️ CSV-Export nur pro Monat möglich.</p>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

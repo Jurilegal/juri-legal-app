@@ -130,13 +130,22 @@ export default function AnwaltDashboardPage() {
       {/* Onboarding Checklist (if not 100%) */}
       {progress < 100 && (
         <Card className="p-6 border-gold-200 bg-gradient-to-r from-gold-50/50 to-white">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-navy-800">🚀 Erste Schritte</h2>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-navy-600">{completedCount}/{checklist.length}</span>
-              <div className="w-24 h-2 bg-navy-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gold-400 rounded-full transition-all" style={{ width: `${progress}%` }} />
-              </div>
+          <div className="flex items-center gap-6 mb-4">
+            {/* Circular Progress */}
+            <div className="relative w-20 h-20 flex-shrink-0">
+              <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="7" />
+                <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 34}`}
+                  strokeDashoffset={`${2 * Math.PI * 34 * (1 - progress / 100)}`}
+                  className="transition-all duration-700" />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-navy-900">{progress}%</span>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-navy-800">🚀 Erste Schritte</h2>
+              <p className="text-sm text-navy-400 mt-1">{completedCount} von {checklist.length} Schritten abgeschlossen</p>
             </div>
           </div>
           <div className="space-y-2">

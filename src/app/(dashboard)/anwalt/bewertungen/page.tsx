@@ -58,6 +58,16 @@ export default function BewertungenPage() {
       reason: deleteReason,
     })
 
+    // Create admin task for review deletion
+    await supabase.from('tasks').insert({
+      title: `Löschantrag: Bewertung prüfen`,
+      description: `Anwalt beantragt Löschung einer Bewertung.\n\nBegründung: ${deleteReason}`,
+      status: 'open',
+      module: 'accounts',
+      related_entity_id: reviewId,
+      related_entity_type: 'review_deletion',
+    })
+
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, deletion_requested: true } : r))
     setDeleteModal(null)
     setDeleteReason('')
