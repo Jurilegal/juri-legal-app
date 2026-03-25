@@ -1,21 +1,45 @@
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
+import { createClient } from '@/lib/supabase/server'
 
-export default function MandantDashboardPage() {
+export default async function MandantDashboardPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [
+    { count: sessionCount },
+    { count: reviewCount },
+    { data: payments },
+    { data: freeMinData },
+  ] = await Promise.all([
+    supabase.from('consultation_sessions').select('*', { count: 'exact', head: true }).eq('mandant_id', user!.id),
+    supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('mandant_id', user!.id),
+    supabase.from('session_payments').select('amount_captured').eq('mandant_id', user!.id).eq('status', 'captured'),
+    supabase.rpc('get_free_minutes_balance', { uid: user!.id }),
+  ])
+
+  const totalSpent = (payments || []).reduce((s, p) => s + (p.amount_captured || 0), 0)
+  const freeMinutes = (freeMinData as unknown as number) || 0
+
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-6">
           <p className="text-sm text-navy-400">Beratungen</p>
-          <p className="text-2xl font-bold text-navy-900 mt-1">0</p>
+          <p className="text-2xl font-bold text-navy-900 mt-1">{sessionCount || 0}</p>
         </Card>
         <Card className="p-6">
           <p className="text-sm text-navy-400">Ausgaben gesamt</p>
-          <p className="text-2xl font-bold text-navy-900 mt-1">0,00 €</p>
+          <p className="text-2xl font-bold text-navy-900 mt-1">{(totalSpent / 100).toFixed(2)} €</p>
         </Card>
         <Card className="p-6">
           <p className="text-sm text-navy-400">Bewertungen</p>
-          <p className="text-2xl font-bold text-navy-900 mt-1">0</p>
+          <p className="text-2xl font-bold text-navy-900 mt-1">{reviewCount || 0}</p>
+        </Card>
+        <Card className="p-6 bg-gradient-to-br from-gold-50 to-gold-100 border-gold-200">
+          <p className="text-sm text-gold-600">Freiminuten</p>
+          <p className="text-2xl font-bold text-gold-700 mt-1">{freeMinutes} Min.</p>
+          <p className="text-xs text-gold-500 mt-1">Geschenkt bei Registrierung & Bewertungen</p>
         </Card>
       </div>
 

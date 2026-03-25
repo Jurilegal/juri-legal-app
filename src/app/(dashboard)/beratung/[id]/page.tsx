@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
+import { ReviewForm } from './ReviewForm'
 
 interface Message {
   id: string
@@ -38,6 +39,7 @@ export default function ChatRoomPage() {
   const [otherAvatar, setOtherAvatar] = useState('')
   const [sending, setSending] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [existingReview, setExistingReview] = useState<{ rating: number; comment: string | null } | null | undefined>(undefined)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -81,6 +83,14 @@ export default function ChatRoomPage() {
         .order('created_at', { ascending: true })
 
       if (msgs) setMessages(msgs)
+
+      // Load existing review
+      const { data: review } = await supabase
+        .from('reviews')
+        .select('rating, comment')
+        .eq('session_id', id)
+        .maybeSingle()
+      setExistingReview(review || null)
     }
     init()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,7 +284,12 @@ export default function ChatRoomPage() {
             </Button>
           </form>
         ) : isCompleted ? (
-          <p className="text-center text-navy-400 text-sm">Diese Beratung ist beendet.</p>
+          <div className="space-y-3">
+            <p className="text-center text-navy-400 text-sm">Diese Beratung ist beendet.</p>
+            {!isAnwalt && session.status === 'completed' && existingReview !== undefined && (
+              <ReviewForm sessionId={session.id} anwaltId={session.anwalt_id} existingReview={existingReview} />
+            )}
+          </div>
         ) : (
           <p className="text-center text-navy-400 text-sm">Chat wird gestartet, sobald die Anfrage angenommen wird.</p>
         )}

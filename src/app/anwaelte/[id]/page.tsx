@@ -6,6 +6,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { SessionRequestButton } from './SessionRequestButton'
+import { ReviewsList } from './ReviewsList'
 import Link from 'next/link'
 
 export default async function LawyerProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -97,6 +98,9 @@ export default async function LawyerProfilePage({ params }: { params: Promise<{ 
                   <p className="text-navy-500 leading-relaxed whitespace-pre-wrap">{lawyer.bio}</p>
                 </Card>
               )}
+
+              {/* Reviews */}
+              <ReviewsList anwaltId={id} />
             </div>
 
             <div className="space-y-6">
