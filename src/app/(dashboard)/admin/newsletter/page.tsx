@@ -102,7 +102,7 @@ export default function NewsletterPage() {
         html += `<div style="padding:10px 20px;border:1px solid #eee;margin:10px 20px;border-radius:8px;">`
         if (b.image) html += `<img src="${b.image}" alt="" style="max-width:100%;border-radius:4px;"/>`
         html += `<p>${b.description}</p>`
-        if (b.linkId) html += `<a href="TRACK:${b.linkId}" style="color:#D4A843;">Mehr erfahren →</a>`
+        if (b.linkId) html += `<a href="TRACK:${b.linkId}" style="color:#48D1CC;">Mehr erfahren →</a>`
         html += `</div>`
       })
     }

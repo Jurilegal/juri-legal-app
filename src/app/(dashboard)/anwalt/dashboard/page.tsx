@@ -135,7 +135,7 @@ export default function AnwaltDashboardPage() {
             <div className="relative w-20 h-20 flex-shrink-0">
               <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
                 <circle cx="40" cy="40" r="34" fill="none" stroke="#e5e7eb" strokeWidth="7" />
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#D4A843" strokeWidth="7"
+                <circle cx="40" cy="40" r="34" fill="none" stroke="#48D1CC" strokeWidth="7"
                   strokeLinecap="round"
                   strokeDasharray={`${2 * Math.PI * 34}`}
                   strokeDashoffset={`${2 * Math.PI * 34 * (1 - progress / 100)}`}

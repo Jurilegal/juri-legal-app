@@ -1,28 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-50: #f0f3f8;
-  --color-navy-100: #d9e0ed;
-  --color-navy-200: #b3c1db;
-  --color-navy-300: #8da2c9;
-  --color-navy-400: #6783b7;
-  --color-navy-500: #4164a5;
-  --color-navy-600: #345084;
-  --color-navy-700: #273d63;
-  --color-navy-800: #1B2A4A;
-  --color-navy-900: #0f1a30;
-  --color-navy-950: #080d18;
+  /* Design B: Downriver Blue + Turquoise (CI Studie) */
+  --color-navy-50: #f0f4f8;
+  --color-navy-100: #d6e0ec;
+  --color-navy-200: #adc1d9;
+  --color-navy-300: #7a9bbd;
+  --color-navy-400: #4d7aa5;
+  --color-navy-500: #285d8e;
+  --color-navy-600: #1b4872;
+  --color-navy-700: #133659;
+  --color-navy-800: #0A2A4D;
+  --color-navy-900: #061b33;
+  --color-navy-950: #030e1a;
   
-  --color-gold-50: #fdf8ee;
-  --color-gold-100: #f9ecd3;
-  --color-gold-200: #f3d9a7;
-  --color-gold-300: #edc67b;
-  --color-gold-400: #D4A843;
-  --color-gold-500: #c49a35;
-  --color-gold-600: #a37d2a;
-  --color-gold-700: #826020;
-  --color-gold-800: #614416;
-  --color-gold-900: #40280c;
+  --color-gold-50: #edfcfb;
+  --color-gold-100: #ccf5f3;
+  --color-gold-200: #99ebe7;
+  --color-gold-300: #6fe0dc;
+  --color-gold-400: #48D1CC;
+  --color-gold-500: #3bbfba;
+  --color-gold-600: #2e9e9a;
+  --color-gold-700: #237b78;
+  --color-gold-800: #185856;
+  --color-gold-900: #0d3534;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
