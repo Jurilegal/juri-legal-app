@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const year = parseInt(url.searchParams.get('year') || '')
 
   if (!month || !year || month < 1 || month > 12) {
-    return NextResponse.json({ error: 'Monat und Jahr sind erforderlich (month=1-12, year=YYYY)' }, { status: 400 })
+    return NextResponse.json({ error: 'Monat und Jahr erforderlich (month=1-12, year=YYYY)' }, { status: 400 })
   }
 
   const startDate = new Date(year, month - 1, 1).toISOString()
@@ -26,8 +26,8 @@ export async function GET(request: Request) {
     .lte('started_at', endDate)
     .order('started_at', { ascending: true })
 
-  if (!sessions?.length) {
-    return NextResponse.json({ error: 'Keine Beratungen in diesem Zeitraum' }, { status: 404 })
+  if (!sessions || sessions.length === 0) {
+    return new Response('Keine Beratungen im gewählten Zeitraum.', { status: 200, headers: { 'Content-Type': 'text/plain' } })
   }
 
   // Get payments
@@ -44,17 +44,14 @@ export async function GET(request: Request) {
   const header = 'session_id,mandant_id,start_time,end_time,duration_minutes,revenue_eur\n'
   const rows = sessions.map(s => {
     const pay = payMap.get(s.id)
-    const revenue = pay ? ((pay.amount_captured - (pay.platform_fee || 0)) / 100).toFixed(2) : '0.00'
-    const duration = s.duration_seconds ? Math.ceil(s.duration_seconds / 60) : 0
-    return `${s.id},${s.mandant_id},${s.started_at || ''},${s.ended_at || ''},${duration},${revenue}`
+    const revenue = pay ? ((pay.amount_captured || 0) - (pay.platform_fee || 0)) / 100 : 0
+    return `${s.id},${s.mandant_id},${s.started_at || ''},${s.ended_at || ''},${s.duration_seconds ? Math.ceil(s.duration_seconds / 60) : 0},${revenue.toFixed(2)}`
   }).join('\n')
 
-  const csv = header + rows
-
-  return new NextResponse(csv, {
+  return new Response(header + rows, {
     headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="beratungen_${year}-${month.toString().padStart(2, '0')}.csv"`,
+      'Content-Type': 'text/csv',
+      'Content-Disposition': `attachment; filename="beratungen-${year}-${String(month).padStart(2, '0')}.csv"`,
     },
   })
 }
