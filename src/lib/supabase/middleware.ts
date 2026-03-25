@@ -27,13 +27,41 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  const pathname = request.nextUrl.pathname
   const protectedRoutes = ['/dashboard', '/anwalt', '/mandant', '/admin']
-  const isProtected = protectedRoutes.some(route => request.nextUrl.pathname.startsWith(route))
+  const isProtected = protectedRoutes.some(route => pathname.startsWith(route))
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
+  }
+
+  // Role-based route protection
+  if (user && isProtected) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = profile?.role
+
+    if (pathname.startsWith('/admin') && role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = role === 'anwalt' ? '/anwalt/dashboard' : '/mandant/dashboard'
+      return NextResponse.redirect(url)
+    }
+    if (pathname.startsWith('/anwalt') && role !== 'anwalt' && role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = role === 'admin' ? '/admin/dashboard' : '/mandant/dashboard'
+      return NextResponse.redirect(url)
+    }
+    if (pathname.startsWith('/mandant') && role !== 'mandant' && role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = role === 'anwalt' ? '/anwalt/dashboard' : '/admin/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
