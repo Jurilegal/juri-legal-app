@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 
 const iconClass = 'w-5 h-5'
@@ -20,13 +21,23 @@ const adminItems = [
 ]
 
 export function DashboardShell({ children, role, userName }: { children: React.ReactNode; role: string; userName: string }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const items = role === 'anwalt' ? anwaltItems : role === 'admin' ? adminItems : mandantItems
 
   return (
     <div className="min-h-screen bg-navy-50/50">
-      <Sidebar items={items} role={role} />
-      <main className="ml-64 p-8">
-        <div className="mb-8">
+      <Sidebar items={items} role={role} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      {/* Mobile header */}
+      <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-navy-100 px-4 py-3 flex items-center gap-3">
+        <button onClick={() => setSidebarOpen(true)} className="text-navy-700 hover:text-navy-900 cursor-pointer">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <span className="text-sm font-semibold text-navy-900">{userName}</span>
+      </div>
+
+      <main className="lg:ml-64 p-4 sm:p-6 lg:p-8">
+        <div className="mb-8 hidden lg:block">
           <p className="text-sm text-navy-400">Willkommen zurück,</p>
           <h1 className="text-2xl font-bold text-navy-900">{userName}</h1>
         </div>
