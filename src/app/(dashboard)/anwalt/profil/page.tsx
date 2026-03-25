@@ -98,7 +98,7 @@ export default function AnwaltProfilPage() {
             value={form.bio}
             onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
             rows={5}
-            className="w-full px-4 py-3 rounded-xl border border-navy-200 bg-white text-navy-800 placeholder:text-navy-300 focus:outline-none focus:ring-2 focus:ring-gold-400/50 focus:border-gold-400 transition-all duration-200 resize-none"
+            className="w-full px-4 py-3 rounded-xl border border-navy-200 bg-white text-navy-800 placeholder:text-navy-300 focus:outline-none focus:ring-2 focus:ring-gold-400/50 focus:border-gold-400 transition-all duration-200 resize-y"
             placeholder="Beschreiben Sie Ihre Expertise und Erfahrung..."
           />
         </div>
