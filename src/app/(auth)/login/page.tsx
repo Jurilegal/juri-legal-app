@@ -36,7 +36,7 @@ export default function LoginPage() {
 
     if (profile?.role === 'anwalt') {
       router.push('/anwalt/dashboard')
-    } else if (profile?.role === 'admin') {
+    } else if (profile?.role === 'admin' || profile?.role === 'super_admin') {
       router.push('/admin/dashboard')
     } else {
       router.push('/mandant/dashboard')

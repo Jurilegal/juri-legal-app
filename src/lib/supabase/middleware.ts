@@ -47,17 +47,19 @@ export async function updateSession(request: NextRequest) {
 
     const role = profile?.role
 
-    if (pathname.startsWith('/admin') && role !== 'admin') {
+    const isAdmin = role === 'admin' || role === 'super_admin'
+
+    if (pathname.startsWith('/admin') && !isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = role === 'anwalt' ? '/anwalt/dashboard' : '/mandant/dashboard'
       return NextResponse.redirect(url)
     }
-    if (pathname.startsWith('/anwalt') && role !== 'anwalt' && role !== 'admin') {
+    if (pathname.startsWith('/anwalt') && role !== 'anwalt' && !isAdmin) {
       const url = request.nextUrl.clone()
-      url.pathname = role === 'admin' ? '/admin/dashboard' : '/mandant/dashboard'
+      url.pathname = isAdmin ? '/admin/dashboard' : '/mandant/dashboard'
       return NextResponse.redirect(url)
     }
-    if (pathname.startsWith('/mandant') && role !== 'mandant' && role !== 'admin') {
+    if (pathname.startsWith('/mandant') && role !== 'mandant' && !isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = role === 'anwalt' ? '/anwalt/dashboard' : '/admin/dashboard'
       return NextResponse.redirect(url)
