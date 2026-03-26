@@ -28,6 +28,8 @@ const commands:Command[] = [
   {label:'Dokument-Viewer', icon:'👁️', href:'/anwalt/kanzlei/dokument-viewer', keywords:['dokument','viewer','pdf','vorschau']},
   {label:'Kalender', icon:'📅', href:'/anwalt/kanzlei/kalender', keywords:['kalender','termin','calendar']},
   {label:'Textbausteine', icon:'📋', href:'/anwalt/kanzlei/textbausteine', keywords:['textbaustein','snippet','baustein']},
+  {label:'Offene Posten', icon:'💶', href:'/anwalt/kanzlei/offene-posten', keywords:['offen','posten','op','forderung','ausstehend']},
+  {label:'Akte öffnen', icon:'📁', href:'/anwalt/kanzlei/akten', keywords:['akte','detail','öffnen']},
   {label:'Einstellungen', icon:'⚙️', href:'/anwalt/kanzlei/einstellungen', keywords:['einstellungen','settings','briefkopf','kanzlei']},
   {label:'Dashboard', icon:'🏠', href:'/anwalt/dashboard', keywords:['dashboard','home','start']},
   {label:'Profil', icon:'👤', href:'/anwalt/profil', keywords:['profil','einstellungen']},
