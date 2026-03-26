@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 
-interface Deadline { id: string; title: string; due_date: string; priority: string; completed: boolean; case_title?: string; case_id: string | null; notes: string | null }
+interface Deadline { id: string; title: string; due_date: string; priority: string; completed: boolean; case_title?: string; case_id: string | null; notes: string | null; reminder_days_before: number|null }
 interface Task { id: string; title: string; status: string; priority: string; due_date: string | null; case_title?: string }
 
 const priorityMap: Record<string, { label: string; variant: 'error' | 'warning' | 'neutral' | 'success' }> = {
@@ -21,7 +21,7 @@ export default function FristenPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'fristen' | 'aufgaben'>('fristen')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ title: '', due_date: '', priority: 'normal', notes: '' })
+  const [form, setForm] = useState({ title: '', due_date: '', priority: 'normal', notes: '', reminder_days_before: '3' })
   const [taskForm, setTaskForm] = useState({ title: '', due_date: '', priority: 'normal', description: '' })
   const [saving, setSaving] = useState(false)
 
@@ -44,8 +44,8 @@ export default function FristenPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    await supabase.from('deadlines').insert({ ...form, user_id: user.id })
-    setForm({ title: '', due_date: '', priority: 'normal', notes: '' }); setShowForm(false); setSaving(false); loadAll()
+    await supabase.from('deadlines').insert({ title:form.title, due_date:form.due_date, priority:form.priority, notes:form.notes||null, reminder_days_before:parseInt(form.reminder_days_before)||3, user_id: user.id })
+    setForm({ title: '', due_date: '', priority: 'normal', notes: '', reminder_days_before: '3' }); setShowForm(false); setSaving(false); loadAll()
   }
 
   async function addTask() {
@@ -68,11 +68,38 @@ export default function FristenPage() {
   }
 
   const today = new Date().toISOString().split('T')[0]
+  const todayMs = Date.now()
+  const upcomingReminders = deadlines.filter(d=>{
+    if(d.completed) return false
+    const dueMs = new Date(d.due_date).getTime()
+    const reminderDays = d.reminder_days_before || 3
+    const reminderMs = dueMs - reminderDays*86400000
+    return todayMs >= reminderMs && todayMs < dueMs
+  })
+  const overdueFristen = deadlines.filter(d=>!d.completed && d.due_date < today)
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-navy-200 border-t-gold-400 rounded-full animate-spin" /></div>
 
   return (
     <div className="space-y-6">
+      {/* Reminder Banner */}
+      {(overdueFristen.length>0 || upcomingReminders.length>0) && (
+        <div className={`p-4 rounded-xl ${overdueFristen.length>0?'bg-red-50 border border-red-200':'bg-amber-50 border border-amber-200'}`}>
+          {overdueFristen.length>0 && (
+            <div className="mb-2"><span className="text-sm font-semibold text-red-700">🚨 {overdueFristen.length} überfällige Frist{overdueFristen.length>1?'en':''}!</span>
+              <ul className="mt-1">{overdueFristen.slice(0,5).map(d=><li key={d.id} className="text-xs text-red-600">• {d.title} — fällig am {new Date(d.due_date).toLocaleDateString('de-DE')}</li>)}</ul>
+            </div>
+          )}
+          {upcomingReminders.length>0 && (
+            <div><span className="text-sm font-semibold text-amber-700">⏰ {upcomingReminders.length} Erinnerung{upcomingReminders.length>1?'en':''}:</span>
+              <ul className="mt-1">{upcomingReminders.map(d=>{
+                const days = Math.ceil((new Date(d.due_date).getTime()-todayMs)/86400000)
+                return <li key={d.id} className="text-xs text-amber-600">• {d.title} — in {days} Tag{days>1?'en':''} fällig</li>
+              })}</ul>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           {(['fristen', 'aufgaben'] as const).map(t => (
@@ -92,6 +119,10 @@ export default function FristenPage() {
           <div><label className="text-sm text-navy-400 block mb-1">Priorität</label>
           <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="px-3 py-2 rounded-lg border border-navy-200 text-sm w-full">
             <option value="low">Niedrig</option><option value="normal">Normal</option><option value="high">Hoch</option><option value="critical">Kritisch</option>
+          </select></div>
+          <div><label className="text-sm text-navy-400 block mb-1">Erinnerung (Tage vorher)</label>
+          <select value={form.reminder_days_before} onChange={e => setForm(f => ({ ...f, reminder_days_before: e.target.value }))} className="px-3 py-2 rounded-lg border border-navy-200 text-sm w-full">
+            <option value="1">1 Tag</option><option value="2">2 Tage</option><option value="3">3 Tage</option><option value="5">5 Tage</option><option value="7">1 Woche</option><option value="14">2 Wochen</option>
           </select></div>
         </div><Button variant="primary" size="sm" onClick={addDeadline} loading={saving} disabled={!form.title.trim() || !form.due_date}>Frist anlegen</Button></Card>
       )}
