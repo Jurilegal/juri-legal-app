@@ -19,7 +19,7 @@ export function Navbar() {
             <Link href="/anwaelte" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
               Anwälte finden
             </Link>
-            <Link href="/#so-funktionierts" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
+            <Link href="/so-funktionierts" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
               So funktioniert&apos;s
             </Link>
             <Link href="/#preise" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
