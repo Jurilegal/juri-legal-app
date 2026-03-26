@@ -30,6 +30,8 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
   const [uploading, setUploading] = useState(false)
   const [linkedCases, setLinkedCases] = useState<{id:string;linked_case_id:string;link_type:string;title?:string}[]>([])
   const [allCases, setAllCases] = useState<{id:string;title:string;reference_number:string|null}[]>([])
+  const [docFolder, setDocFolder] = useState('/')
+  const [newFolderName, setNewFolderName] = useState('')
 
   useEffect(()=>{load()}, [id]) // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
@@ -96,6 +98,7 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
   if(loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-navy-200 border-t-gold-400 rounded-full animate-spin"/></div>
   if(!caseData) return <Card className="p-8 text-center"><p className="text-navy-400">Akte nicht gefunden.</p></Card>
 
+  const filteredDocs = docFolder==='/'?docs:docs.filter(d=>d.folder===docFolder)
   const statusColors:Record<string,string> = { active:'success', pending:'warning', closed:'neutral', archived:'neutral' }
   const today = new Date().toISOString().split('T')[0]
 
@@ -198,9 +201,21 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {/* Docs */}
+      {/* Docs with folder structure & versioning */}
       {tab==='docs' && (
         <div className="space-y-4">
+          {/* Folder navigation */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-navy-400">Ordner:</span>
+            {['/','/Schriftsätze','/Korrespondenz','/Verträge','/Beweise','/Rechnungen','/Sonstiges'].map(f=>(
+              <button key={f} onClick={()=>setDocFolder(f)} className={`px-2 py-1 rounded text-xs cursor-pointer ${docFolder===f?'bg-navy-800 text-white':'bg-navy-50 text-navy-600 hover:bg-navy-100'}`}>
+                📁 {f==='/'?'Alle':f.slice(1)}
+              </button>
+            ))}
+            <div className="flex-1"/>
+            <input value={newFolderName} onChange={e=>setNewFolderName(e.target.value)} placeholder="Neuer Ordner..." className="px-2 py-1 border border-navy-200 rounded text-xs w-32"/>
+            <button onClick={()=>{if(newFolderName.trim()){setDocFolder('/'+newFolderName.trim());setNewFolderName('')}}} className="text-xs text-gold-600 cursor-pointer">+ Ordner</button>
+          </div>
           <DragDropUpload uploading={uploading} onFilesSelected={async(files)=>{
             setUploading(true)
             const { data:{user} } = await supabase.auth.getUser()
@@ -208,17 +223,42 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
             for(const file of files) {
               const path = `kanzlei/${user.id}/${id}/${Date.now()}-${file.name}`
               await supabase.storage.from('lawyer-documents').upload(path, file)
-              await supabase.from('case_documents').insert({ case_id:id, user_id:user.id, name:file.name, file_path:path, original_filename:file.name, mime_type:file.type, file_size:file.size })
-              await logActivity(user.id, 'dokument_hochgeladen', {name:file.name})
+              await supabase.from('case_documents').insert({ case_id:id, user_id:user.id, name:file.name, file_path:path, original_filename:file.name, mime_type:file.type, file_size:file.size, folder:docFolder==='/'?'/':docFolder, version:1 })
+              await logActivity(user.id, 'dokument_hochgeladen', {name:file.name, folder:docFolder})
             }
             setUploading(false); load()
           }}/>
-          {docs.length===0?<p className="text-sm text-navy-400">Keine Dokumente.</p>:
-          docs.map(d=>(
+          {filteredDocs.length===0?<p className="text-sm text-navy-400">Keine Dokumente{docFolder!=='/'?` in ${docFolder}`:''}</p>:
+          filteredDocs.map(d=>(
             <Card key={d.id} className="p-3">
               <div className="flex items-center justify-between">
-                <div><span className="text-sm font-medium text-navy-800">📄 {d.name}</span><span className="text-xs text-navy-400 ml-2">{d.folder!=='/'?d.folder:''} · v{d.version}</span></div>
-                {d.status && <Badge variant="neutral">{d.status}</Badge>}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-navy-800">📄 {d.name}</span>
+                  <span className="text-xs text-navy-400">{d.folder!=='/'?d.folder:''}</span>
+                  <span className="text-[10px] bg-navy-50 text-navy-400 px-1.5 py-0.5 rounded">v{d.version}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {d.status && <Badge variant="neutral">{d.status}</Badge>}
+                  <button onClick={async()=>{
+                    // New version upload
+                    const input = document.createElement('input'); input.type='file'
+                    input.onchange=async(e)=>{
+                      const file=(e.target as HTMLInputElement).files?.[0]; if(!file) return
+                      setUploading(true)
+                      const { data:{user} } = await supabase.auth.getUser(); if(!user) return
+                      const path=`kanzlei/${user.id}/${id}/${Date.now()}-${file.name}`
+                      await supabase.storage.from('lawyer-documents').upload(path,file)
+                      await supabase.from('case_documents').insert({case_id:id,user_id:user.id,name:d.name,file_path:path,original_filename:file.name,mime_type:file.type,file_size:file.size,folder:d.folder,version:d.version+1,parent_document_id:d.id})
+                      await logActivity(user.id,'dokument_version',{name:d.name,version:d.version+1})
+                      setUploading(false); load()
+                    }; input.click()
+                  }} className="text-xs text-gold-600 cursor-pointer hover:text-gold-800" title="Neue Version hochladen">📤</button>
+                  <button onClick={async()=>{
+                    if(!confirm(`Dokument "${d.name}" löschen?`)) return
+                    await supabase.from('case_documents').delete().eq('id',d.id)
+                    load()
+                  }} className="text-xs text-red-400 cursor-pointer hover:text-red-600">🗑️</button>
+                </div>
               </div>
             </Card>
           ))}

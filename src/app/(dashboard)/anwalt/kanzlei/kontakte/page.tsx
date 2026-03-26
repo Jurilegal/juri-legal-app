@@ -25,6 +25,9 @@ export default function KontaktePage() {
   const [editing, setEditing] = useState<Contact|null>(null)
   const [form, setForm] = useState({ contact_type:'mandant', first_name:'', last_name:'', company_name:'', email:'', phone:'', fax:'', address:'', zip:'', city:'', notes:'' })
   const [saving, setSaving] = useState(false)
+  const [expandedId, setExpandedId] = useState<string|null>(null)
+  const [linkedCases, setLinkedCases] = useState<{id:string;contact_id:string;case_id:string;role:string;case_title?:string}[]>([])
+  const [allCases, setAllCases] = useState<{id:string;title:string;reference_number:string|null}[]>([])
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
@@ -32,7 +35,10 @@ export default function KontaktePage() {
     const { data:{user} } = await supabase.auth.getUser()
     if(!user) return
     const { data } = await supabase.from('kanzlei_contacts').select('*').eq('user_id',user.id).order('last_name')
-    setContacts((data||[]) as Contact[]); setLoading(false)
+    setContacts((data||[]) as Contact[])
+    const { data:cases } = await supabase.from('cases').select('id,title,reference_number').eq('user_id',user.id)
+    setAllCases((cases||[]) as typeof allCases)
+    setLoading(false)
   }
   async function save() {
     setSaving(true)
@@ -51,6 +57,24 @@ export default function KontaktePage() {
     setEditing(c); setShowForm(true)
   }
   function resetForm() { setForm({ contact_type:'mandant', first_name:'', last_name:'', company_name:'', email:'', phone:'', fax:'', address:'', zip:'', city:'', notes:'' }); setEditing(null); setShowForm(false) }
+
+  async function toggleExpand(contactId:string) {
+    if(expandedId===contactId) { setExpandedId(null); return }
+    setExpandedId(contactId)
+    const { data } = await supabase.from('case_contacts').select('*').eq('contact_id',contactId)
+    const mapped = (data||[]).map(cc=>({...cc, case_title:allCases.find(c=>c.id===cc.case_id)?.title}))
+    setLinkedCases(mapped)
+  }
+  async function linkContactToCase(contactId:string, caseId:string, role:string) {
+    const { data:{user} } = await supabase.auth.getUser()
+    if(!user) return
+    await supabase.from('case_contacts').insert({contact_id:contactId, case_id:caseId, role})
+    toggleExpand(contactId)
+  }
+  async function unlinkContact(linkId:string, contactId:string) {
+    await supabase.from('case_contacts').delete().eq('id',linkId)
+    toggleExpand(contactId)
+  }
 
   const filtered = contacts.filter(c => {
     if(filterType && c.contact_type !== filterType) return false
@@ -113,8 +137,34 @@ export default function KontaktePage() {
                   </div>
                   <p className="text-xs text-navy-400 mt-0.5">{[c.email,c.phone,c.city].filter(Boolean).join(' · ')}</p>
                 </div>
+                <button onClick={()=>toggleExpand(c.id)} className="text-navy-400 hover:text-navy-600 text-sm cursor-pointer" title="Akten verknüpfen">🔗</button>
                 <button onClick={()=>deleteContact(c.id)} className="text-red-400 hover:text-red-600 text-sm cursor-pointer">🗑️</button>
               </div>
+              {expandedId===c.id && (
+                <div className="mt-3 pt-3 border-t border-navy-100 space-y-2">
+                  <p className="text-xs font-medium text-navy-500">Verknüpfte Akten:</p>
+                  {linkedCases.filter(l=>l.contact_id===c.id).map(l=>(
+                    <div key={l.id} className="flex items-center justify-between p-2 bg-navy-50 rounded-lg">
+                      <span className="text-sm text-navy-700">📁 {l.case_title||'Unbekannt'} <span className="text-xs text-navy-400">({l.role})</span></span>
+                      <button onClick={()=>unlinkContact(l.id,c.id)} className="text-red-400 text-xs cursor-pointer">✕</button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <select id={`linkCase-${c.id}`} className="flex-1 px-2 py-1.5 rounded-lg border border-navy-200 text-xs">
+                      <option value="">Akte wählen...</option>
+                      {allCases.map(ac=><option key={ac.id} value={ac.id}>{ac.reference_number?`${ac.reference_number} — `:''}{ac.title}</option>)}
+                    </select>
+                    <select id={`linkRole-${c.id}`} className="px-2 py-1.5 rounded-lg border border-navy-200 text-xs">
+                      <option value="beteiligter">Beteiligter</option><option value="mandant">Mandant</option><option value="gegner">Gegner</option><option value="zeuge">Zeuge</option><option value="gutachter">Gutachter</option>
+                    </select>
+                    <button onClick={()=>{
+                      const caseId=(document.getElementById(`linkCase-${c.id}`) as HTMLSelectElement)?.value
+                      const role=(document.getElementById(`linkRole-${c.id}`) as HTMLSelectElement)?.value||'beteiligter'
+                      if(caseId) linkContactToCase(c.id,caseId,role)
+                    }} className="px-3 py-1.5 bg-navy-800 text-white rounded-lg text-xs cursor-pointer">Verknüpfen</button>
+                  </div>
+                </div>
+              )}
             </Card>
           )
         })}</div>
