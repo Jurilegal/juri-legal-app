@@ -25,7 +25,7 @@ export function Navbar() {
             <Link href="/#preise" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
               Preise
             </Link>
-            <Link href="/#faq" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
+            <Link href="/faq" className="text-navy-600 hover:text-navy-800 font-medium transition-colors">
               FAQ
             </Link>
           </div>
