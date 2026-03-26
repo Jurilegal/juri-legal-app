@@ -71,6 +71,20 @@ export default function ReportingPage() {
         <Card className="p-5"><p className="text-xs text-navy-400">Akten / Mandanten</p><p className="text-2xl font-bold text-navy-900">{stats.totalCases} / {stats.totalClients}</p></Card>
       </div>
 
+      {/* Export */}
+      <div className="flex gap-2 justify-end">
+        <button onClick={()=>{
+          if(!stats) return
+          const csv = `Kennzahl;Wert\nGesamtumsatz;${stats.totalRevenue.toFixed(2)}\nStunden;${stats.totalHours.toFixed(1)}\nØ Stundensatz;${stats.avgHourlyRate.toFixed(0)}\nAkten;${stats.totalCases}\nMandanten;${stats.totalClients}\n\nMonat;Umsatz\n${stats.revenueByMonth.map(r=>`${r.month};${r.amount.toFixed(2)}`).join('\n')}\n\nAkten-Status;Anzahl\n${stats.casesByStatus.map(c=>`${c.status};${c.count}`).join('\n')}`
+          const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Kanzlei-Report.csv'; a.click()
+        }} className="text-xs text-gold-600 cursor-pointer hover:text-gold-800">📥 CSV Export</button>
+        <button onClick={()=>{
+          if(!stats) return
+          const text = `KANZLEI-REPORT\n${'='.repeat(40)}\n\nGesamtumsatz: ${stats.totalRevenue.toFixed(2)} €\nStunden erfasst: ${stats.totalHours.toFixed(1)} h\nØ Stundensatz: ${stats.avgHourlyRate.toFixed(0)} €\nAkten: ${stats.totalCases}\nMandanten: ${stats.totalClients}\n\nUmsatz pro Monat:\n${stats.revenueByMonth.map(r=>`  ${r.month}: ${r.amount.toFixed(2)} €`).join('\n')}\n\nAkten nach Status:\n${stats.casesByStatus.map(c=>`  ${c.status}: ${c.count}`).join('\n')}\n\nTop-Mandanten:\n${stats.topClients.map((c,i)=>`  ${i+1}. ${c.name}: ${c.amount.toFixed(2)} €`).join('\n')}`
+          const blob=new Blob([text],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Kanzlei-Report.txt'; a.click()
+        }} className="text-xs text-navy-500 cursor-pointer hover:text-navy-700">📄 Text Export</button>
+      </div>
+
       {/* Revenue Chart */}
       <Card className="p-6">
         <h3 className="font-semibold text-navy-800 mb-4">Umsatz pro Monat</h3>

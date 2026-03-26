@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
+import { DragDropUpload } from '@/components/DragDropUpload'
 
 interface CaseDetail { id:string; title:string; description:string|null; status:string; reference_number:string|null; tags:string[]; opponent_name:string|null; custom_fields:Record<string,string>|null; created_at:string; parent_case_id:string|null }
 interface Note { id:string; content:string; note_type:string; created_at:string; updated_at:string }
@@ -26,6 +27,9 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
   const [noteType, setNoteType] = useState('notiz')
   const [savingNote, setSavingNote] = useState(false)
   const [newTag, setNewTag] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [linkedCases, setLinkedCases] = useState<{id:string;linked_case_id:string;link_type:string;title?:string}[]>([])
+  const [allCases, setAllCases] = useState<{id:string;title:string;reference_number:string|null}[]>([])
 
   useEffect(()=>{load()}, [id]) // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
@@ -44,6 +48,17 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
     setActivities((r3.data||[]) as Activity[])
     setDocs((r4.data||[]) as Doc[])
     setDeadlines((r5.data||[]) as Deadline[])
+    // Load linked cases
+    const { data:links } = await supabase.from('case_links').select('*').eq('case_id',id)
+    const { data:ac } = await supabase.from('cases').select('id,title,reference_number').eq('user_id',user.id)
+    setAllCases((ac||[]) as typeof allCases)
+    if(links?.length) {
+      const mapped = links.map(l => {
+        const c = (ac||[]).find(a=>a.id===l.linked_case_id)
+        return { ...l, title: c?.title }
+      })
+      setLinkedCases(mapped)
+    }
     setLoading(false)
   }
   async function addNote() {
@@ -125,11 +140,37 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Overview */}
       {tab==='overview' && (
+        <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="p-4"><p className="text-xs text-navy-400">Dokumente</p><p className="text-2xl font-bold text-navy-900">{docs.length}</p></Card>
           <Card className="p-4"><p className="text-xs text-navy-400">Offene Fristen</p><p className="text-2xl font-bold text-amber-600">{deadlines.filter(d=>d.status!=='done').length}</p></Card>
           <Card className="p-4"><p className="text-xs text-navy-400">Notizen</p><p className="text-2xl font-bold text-navy-900">{notes.length}</p></Card>
           {caseData.description && <Card className="p-5 sm:col-span-3"><h3 className="text-sm font-semibold text-navy-800 mb-2">Beschreibung</h3><p className="text-sm text-navy-600 whitespace-pre-wrap">{caseData.description}</p></Card>}
+        </div>
+        {/* Linked Cases */}
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-navy-800">Verknüpfte Akten ({linkedCases.length})</h3>
+          </div>
+          {linkedCases.map(l=>(
+            <div key={l.id} className="flex items-center justify-between p-2 bg-navy-50 rounded-xl mb-1">
+              <span className="text-sm text-navy-700">📁 {l.title||'Unbekannt'}</span>
+              <Badge variant="neutral">{l.link_type}</Badge>
+            </div>
+          ))}
+          <div className="flex gap-2 mt-2">
+            <select id="linkCase" className="flex-1 px-3 py-1.5 rounded-xl border border-navy-200 text-xs">
+              <option value="">Akte verknüpfen...</option>
+              {allCases.filter(c=>c.id!==id&&!linkedCases.some(l=>l.linked_case_id===c.id)).map(c=><option key={c.id} value={c.id}>{c.reference_number?`${c.reference_number} — `:''}{c.title}</option>)}
+            </select>
+            <button onClick={async()=>{
+              const sel = (document.getElementById('linkCase') as HTMLSelectElement)?.value
+              if(!sel) return
+              await supabase.from('case_links').insert({case_id:id, linked_case_id:sel, link_type:'verwandt'})
+              load()
+            }} className="px-3 py-1.5 bg-navy-800 text-white rounded-xl text-xs cursor-pointer">Verknüpfen</button>
+          </div>
+        </Card>
         </div>
       )}
 
@@ -159,12 +200,24 @@ export default function AkteDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Docs */}
       {tab==='docs' && (
-        <div className="space-y-2">
+        <div className="space-y-4">
+          <DragDropUpload uploading={uploading} onFilesSelected={async(files)=>{
+            setUploading(true)
+            const { data:{user} } = await supabase.auth.getUser()
+            if(!user) return
+            for(const file of files) {
+              const path = `kanzlei/${user.id}/${id}/${Date.now()}-${file.name}`
+              await supabase.storage.from('lawyer-documents').upload(path, file)
+              await supabase.from('case_documents').insert({ case_id:id, user_id:user.id, name:file.name, file_path:path, original_filename:file.name, mime_type:file.type, file_size:file.size })
+              await logActivity(user.id, 'dokument_hochgeladen', {name:file.name})
+            }
+            setUploading(false); load()
+          }}/>
           {docs.length===0?<p className="text-sm text-navy-400">Keine Dokumente.</p>:
           docs.map(d=>(
             <Card key={d.id} className="p-3">
               <div className="flex items-center justify-between">
-                <div><span className="text-sm font-medium text-navy-800">{d.name}</span><span className="text-xs text-navy-400 ml-2">{d.folder!=='/'?d.folder:''} · v{d.version}</span></div>
+                <div><span className="text-sm font-medium text-navy-800">📄 {d.name}</span><span className="text-xs text-navy-400 ml-2">{d.folder!=='/'?d.folder:''} · v{d.version}</span></div>
                 {d.status && <Badge variant="neutral">{d.status}</Badge>}
               </div>
             </Card>
