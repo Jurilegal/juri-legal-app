@@ -45,7 +45,7 @@ export function Sidebar({ items, role, open, onClose }: { items: NavItem[]; role
           </span>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin">
           {items.map(item => {
             const active = pathname === item.href
             return (
