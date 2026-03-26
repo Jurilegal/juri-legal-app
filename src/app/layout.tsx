@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { CookieBanner } from '@/components/CookieBanner'
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de">
@@ -23,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-white text-navy-800 antialiased">
         {children}
+        <CookieBanner />
       </body>
     </html>
   )

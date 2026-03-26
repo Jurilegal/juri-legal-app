@@ -44,6 +44,38 @@ export default function AGBPage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold text-navy-800 mt-8 mb-3">§ 4a Juri Coins und Plattformgebühr</h2>
+          <p>
+            Mandanten können &quot;Juri Coins&quot; erwerben (1 EUR = 1 Coin), die zur Bezahlung von Beratungsleistungen
+            eingesetzt werden können. Juri Coins sind nicht übertragbar und nicht erstattungsfähig (vorbehaltlich
+            des Widerrufsrechts). Der Betreiber erhebt eine Plattformgebühr von 5% auf den Beratungsumsatz, die
+            automatisch bei der Abrechnung einbehalten wird. Alle Preise verstehen sich inklusive der gesetzlichen
+            Mehrwertsteuer gemäß § 1 PAngV.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-navy-800 mt-8 mb-3">§ 4b Widerrufsrecht</h2>
+          <p>
+            Verbrauchern steht ein gesetzliches Widerrufsrecht gemäß §§ 355 ff. BGB zu.
+            Die vollständige Widerrufsbelehrung finden Sie unter{' '}
+            <a href="/widerruf" className="text-gold-500 hover:underline">Widerrufsbelehrung</a>.
+            Bei digitalen Inhalten kann das Widerrufsrecht nach § 356 Abs. 5 BGB erlöschen,
+            wenn der Verbraucher ausdrücklich zugestimmt hat und Kenntnis vom Erlöschen genommen hat.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-navy-800 mt-8 mb-3">§ 4c Anwaltliche Unabhängigkeit</h2>
+          <p>
+            Die über die Plattform vermittelten Rechtsanwälte sind in ihrer Berufsausübung unabhängig und
+            unterliegen ausschließlich dem anwaltlichen Berufsrecht (BRAO, BORA). Der Betreiber nimmt keinen
+            Einfluss auf die inhaltliche Beratung. Die Verschwiegenheitspflicht nach § 43a Abs. 2 BRAO bleibt
+            unberührt. Der Betreiber erbringt keine Rechtsdienstleistungen im Sinne des § 2 RDG.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold text-navy-800 mt-8 mb-3">§ 5 Pflichten der Nutzer</h2>
           <p>Nutzer verpflichten sich:</p>
           <ul className="list-disc list-inside mt-2 space-y-1">
