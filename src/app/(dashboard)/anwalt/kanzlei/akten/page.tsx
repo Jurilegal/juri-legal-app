@@ -25,7 +25,7 @@ export default function AktenPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterRechtsgebiet, setFilterRechtsgebiet] = useState('all')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ title:'', case_type:'', opponent_name:'', description:'', parent_case_id:'', autoAz:true })
+  const [form, setForm] = useState({ title:'', case_type:'', opponent_name:'', description:'', parent_case_id:'', autoAz:true, hourly_rate:'' })
   const [saving, setSaving] = useState(false)
 
   useEffect(()=>{loadCases()}, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,13 +60,13 @@ export default function AktenPage() {
     const { data:newCase } = await supabase.from('cases').insert({
       title:form.title, case_type:form.case_type||null, opponent_name:form.opponent_name||null,
       description:form.description||null, reference_number:az||null,
-      parent_case_id:form.parent_case_id||null, user_id:user.id, status:'active', tags:[]
+      parent_case_id:form.parent_case_id||null, hourly_rate:form.hourly_rate?parseFloat(form.hourly_rate):null, user_id:user.id, status:'active', tags:[]
     }).select('id').single()
     // Log activity
     if(newCase) {
       await supabase.from('case_activity_log').insert({ case_id:newCase.id, user_id:user.id, action:'akte_erstellt', details:{title:form.title, az} })
     }
-    setForm({title:'',case_type:'',opponent_name:'',description:'',parent_case_id:'',autoAz:true})
+    setForm({title:'',case_type:'',opponent_name:'',description:'',parent_case_id:'',autoAz:true,hourly_rate:''})
     setShowForm(false); setSaving(false); loadCases()
   }
 
@@ -129,6 +129,7 @@ export default function AktenPage() {
                 <option value="">— wählen —</option>{RECHTSGEBIETE.map(r=><option key={r}>{r}</option>)}
               </select></div>
             <Input label="Gegner" value={form.opponent_name} onChange={e=>setForm(f=>({...f,opponent_name:e.target.value}))}/>
+            <Input label="Stundensatz (€, optional)" type="number" value={form.hourly_rate} onChange={e=>setForm(f=>({...f,hourly_rate:e.target.value}))} placeholder="z.B. 300"/>
             <div><label className="text-sm text-navy-400 block mb-1">Übergeordnete Akte (für Unterakte)</label>
               <select value={form.parent_case_id} onChange={e=>setForm(f=>({...f,parent_case_id:e.target.value}))} className="w-full px-3 py-2 rounded-xl border border-navy-200 text-sm">
                 <option value="">Keine (eigenständige Akte)</option>
