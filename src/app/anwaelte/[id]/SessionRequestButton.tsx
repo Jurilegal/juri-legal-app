@@ -32,7 +32,7 @@ export function SessionRequestButton({ anwaltId }: { anwaltId: string }) {
     setLoading(false)
 
     if (error) {
-      alert('Fehler beim Senden der Anfrage. Bitte versuchen Sie es erneut.')
+      console.error('Anfrage fehlgeschlagen')
       return
     }
 
