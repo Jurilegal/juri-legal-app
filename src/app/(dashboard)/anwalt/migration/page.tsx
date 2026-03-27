@@ -3,176 +3,206 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 
-const systems = [
-  { id: 'ra-micro', name: 'RA-MICRO', icon: '🏛️' },
-  { id: 'actaport', name: 'Actaport', icon: '📋' },
-  { id: 'kleos', name: 'Kleos', icon: '⚖️' },
-  { id: 'advoware', name: 'Advoware', icon: '💼' },
-  { id: 'annotext', name: 'AnNoText', icon: '📝' },
-  { id: 'other', name: 'Andere Software', icon: '🔧' },
-]
+type ImportTarget = 'cases'|'kanzlei_contacts'|'kanzlei_clients'|'deadlines'
+interface MappingField { csv:string; db:string }
 
-const defaultMapping = [
-  { source: 'Mandantennachname', target: 'last_name', auto: true },
-  { source: 'Mandantenvorname', target: 'first_name', auto: true },
-  { source: 'Aktenzeichen', target: 'reference_number', auto: true },
-  { source: 'Gegner', target: 'opponent_name', auto: true },
-  { source: 'Mdt-Nr.', target: '', auto: false },
-]
+const TARGET_FIELDS: Record<ImportTarget, {key:string;label:string;required?:boolean}[]> = {
+  cases: [{key:'title',label:'Titel',required:true},{key:'reference_number',label:'Aktenzeichen'},{key:'legal_area',label:'Rechtsgebiet'},{key:'status',label:'Status'},{key:'description',label:'Beschreibung'}],
+  kanzlei_contacts: [{key:'first_name',label:'Vorname',required:true},{key:'last_name',label:'Nachname',required:true},{key:'contact_type',label:'Typ'},{key:'email',label:'E-Mail'},{key:'phone',label:'Telefon'},{key:'company',label:'Firma'},{key:'street',label:'Straße'},{key:'zip',label:'PLZ'},{key:'city',label:'Ort'}],
+  kanzlei_clients: [{key:'first_name',label:'Vorname',required:true},{key:'last_name',label:'Nachname',required:true},{key:'email',label:'E-Mail'},{key:'phone',label:'Telefon'},{key:'client_type',label:'Typ (privat/geschäftlich)'},{key:'company',label:'Firma'}],
+  deadlines: [{key:'title',label:'Titel',required:true},{key:'due_date',label:'Fälligkeitsdatum',required:true},{key:'priority',label:'Priorität'},{key:'description',label:'Beschreibung'}],
+}
 
-const targetFields = ['first_name', 'last_name', 'email', 'phone', 'address', 'company_name', 'reference_number', 'opponent_name', 'case_type', 'notes', 'custom_id']
+const TARGET_LABELS: Record<ImportTarget,string> = { cases:'Akten', kanzlei_contacts:'Kontakte', kanzlei_clients:'Mandanten', deadlines:'Fristen' }
 
 export default function MigrationPage() {
   const supabase = createClient()
   const [step, setStep] = useState(1)
-  const [system, setSystem] = useState('')
-  const [credentials, setCredentials] = useState({ username: '', password: '', apiKey: '' })
-  const [analysis, setAnalysis] = useState({ cases: 0, documents: 0, contacts: 0, estimatedMinutes: 0 })
-  const [mapping, setMapping] = useState(defaultMapping)
+  const [file, setFile] = useState<File|null>(null)
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvRows, setCsvRows] = useState<string[][]>([])
+  const [target, setTarget] = useState<ImportTarget>('cases')
+  const [mapping, setMapping] = useState<MappingField[]>([])
+  const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [migrating, setMigrating] = useState(false)
-  const [report, setReport] = useState<{ migrated: number; total: number; errors: number; errorDetails: string[] } | null>(null)
+  const [result, setResult] = useState<{success:number;errors:string[]}>({success:0,errors:[]})
+  const [toast, setToast] = useState('')
 
-  async function analyze() {
-    // Simulate analysis
-    await new Promise(r => setTimeout(r, 1500))
-    setAnalysis({ cases: Math.floor(Math.random() * 2000) + 100, documents: Math.floor(Math.random() * 8000) + 500, contacts: Math.floor(Math.random() * 500) + 50, estimatedMinutes: Math.floor(Math.random() * 60) + 15 })
-    setStep(2)
+  function parseCSV(text:string) {
+    const lines = text.split('\n').filter(l=>l.trim())
+    if(lines.length<2) return
+    const sep = lines[0].includes(';')?';':','
+    const headers = lines[0].split(sep).map(h=>h.replace(/"/g,'').trim())
+    const rows = lines.slice(1).map(l=>l.split(sep).map(c=>c.replace(/"/g,'').trim()))
+    setCsvHeaders(headers); setCsvRows(rows)
+    // Auto-map
+    const fields = TARGET_FIELDS[target]
+    const autoMap:MappingField[] = fields.map(f=>{
+      const match = headers.find(h=>h.toLowerCase().includes(f.key.replace('_',' '))||h.toLowerCase()===f.key||h.toLowerCase()===f.label.toLowerCase())
+      return { csv:match||'', db:f.key }
+    })
+    setMapping(autoMap)
+    setStep(3)
   }
 
-  async function startMigration() {
-    setStep(4); setMigrating(true); setProgress(0)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+  async function handleFile(f:File) {
+    setFile(f)
+    const text = await f.text()
+    parseCSV(text)
+  }
 
-    // Create migration job
-    await supabase.from('migration_jobs').insert({
-      user_id: user.id, source_system: system, status: 'migrating',
-      total_items: analysis.cases + analysis.documents + analysis.contacts,
-      field_mapping: mapping,
-    })
+  async function doImport() {
+    setImporting(true); setProgress(0)
+    const { data:{user} } = await supabase.auth.getUser()
+    if(!user) return
+    let success=0; const errors:string[]=[]
 
-    // Simulate migration progress
-    const total = analysis.cases + analysis.documents
-    for (let i = 0; i <= 100; i += 2) {
-      await new Promise(r => setTimeout(r, 200))
-      setProgress(i)
+    for(let i=0;i<csvRows.length;i++) {
+      const row = csvRows[i]
+      const record: Record<string,string> = {}
+      for(const m of mapping) {
+        if(!m.csv) continue
+        const colIdx = csvHeaders.indexOf(m.csv)
+        if(colIdx>=0 && row[colIdx]) record[m.db] = row[colIdx]
+      }
+
+      // Validate required
+      const reqFields = TARGET_FIELDS[target].filter(f=>f.required)
+      const missing = reqFields.filter(f=>!record[f.key])
+      if(missing.length) { errors.push(`Zeile ${i+2}: ${missing.map(f=>f.label).join(', ')} fehlt`); continue }
+
+      // Insert
+      const insertData = { ...record, user_id:user.id } as Record<string,string>
+      if(target==='cases') { insertData.status = insertData.status || 'active' }
+      if(target==='deadlines') { insertData.status = insertData.status || 'offen' }
+
+      const { error } = await supabase.from(target).insert(insertData)
+      if(error) errors.push(`Zeile ${i+2}: ${error.message}`)
+      else success++
+      setProgress(Math.round(((i+1)/csvRows.length)*100))
     }
+    setResult({success,errors}); setStep(5); setImporting(false)
+  }
 
-    const errors = Math.floor(Math.random() * 5)
-    setReport({
-      migrated: total - errors, total,
-      errors,
-      errorDetails: errors > 0 ? Array.from({ length: errors }, (_, i) => `Dokument #${Math.floor(Math.random() * 1000)} konnte nicht heruntergeladen werden (Timeout)`) : [],
-    })
-    setMigrating(false); setStep(5)
+  function downloadTemplate() {
+    const fields = TARGET_FIELDS[target]
+    const csv = fields.map(f=>f.label).join(';')+'\n'
+    const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'})
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`Vorlage-${TARGET_LABELS[target]}.csv`; a.click()
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <h2 className="text-xl font-bold text-navy-800">Migrations-Wizard</h2>
+    <div className="space-y-6 max-w-3xl mx-auto">
+      {toast && <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm bg-green-500 text-white rounded shadow-lg">{toast}</div>}
 
-      {/* Progress Steps */}
-      <div className="flex items-center gap-2">
-        {[1, 2, 3, 4, 5].map(s => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step >= s ? 'bg-gold-400 text-white' : 'bg-navy-100 text-navy-400'}`}>{s}</div>
-            {s < 5 && <div className={`w-8 h-0.5 ${step > s ? 'bg-gold-400' : 'bg-navy-200'}`} />}
-          </div>
+      <div><h2 className="text-xl font-bold text-navy-800">📦 Daten-Migration</h2><p className="text-sm text-navy-400">Importieren Sie Daten aus Ihrer bisherigen Kanzleisoftware</p></div>
+
+      {/* Steps */}
+      <div className="flex gap-2">
+        {[{n:1,l:'Ziel wählen'},{n:2,l:'CSV hochladen'},{n:3,l:'Zuordnung'},{n:4,l:'Import'},{n:5,l:'Ergebnis'}].map(s=>(
+          <div key={s.n} className={`flex-1 py-2 text-center text-xs rounded-xl ${step>=s.n?'bg-navy-800 text-white':'bg-navy-100 text-navy-400'}`}>{s.n}. {s.l}</div>
         ))}
       </div>
-      <p className="text-sm text-navy-400">Schritt {step} von 5: {['Tool-Auswahl', 'Daten-Analyse', 'Feld-Mapping', 'Migration', 'Abschluss'][step - 1]}</p>
 
-      {/* Step 1: Tool Selection */}
-      {step === 1 && (
+      {/* Step 1: Target */}
+      {step===1 && (
         <Card className="p-6 space-y-4">
-          <h3 className="font-semibold text-navy-800">Wählen Sie Ihre aktuelle Kanzleisoftware</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {systems.map(s => (
-              <button key={s.id} onClick={() => setSystem(s.id)}
-                className={`p-4 rounded-xl border text-center cursor-pointer transition-all ${system === s.id ? 'border-gold-400 bg-gold-50 shadow-sm' : 'border-navy-200 hover:border-navy-300'}`}>
-                <span className="text-2xl block mb-1">{s.icon}</span>
-                <span className="text-sm font-medium text-navy-700">{s.name}</span>
+          <h3 className="font-semibold text-navy-800">Was möchten Sie importieren?</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {(Object.keys(TARGET_LABELS) as ImportTarget[]).map(t=>(
+              <button key={t} onClick={()=>setTarget(t)} className={`p-4 rounded-xl border cursor-pointer text-left ${target===t?'border-gold-400 bg-gold-50':'border-navy-100 hover:border-gold-200'}`}>
+                <p className="font-medium text-navy-800">{TARGET_LABELS[t]}</p>
+                <p className="text-xs text-navy-400">{TARGET_FIELDS[t].length} Felder</p>
               </button>
             ))}
           </div>
-          {system && (
-            <div className="space-y-3 pt-4 border-t border-navy-100">
-              <p className="text-sm text-navy-400">Geben Sie Ihre Zugangsdaten ein. Diese werden nur für die Migration verwendet und nicht gespeichert.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label className="text-xs text-navy-400">Benutzername / E-Mail</label><input type="text" value={credentials.username} onChange={e => setCredentials(c => ({ ...c, username: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-navy-200 text-sm mt-1" /></div>
-                <div><label className="text-xs text-navy-400">Passwort / API-Key</label><input type="password" value={credentials.password} onChange={e => setCredentials(c => ({ ...c, password: e.target.value }))} className="w-full px-3 py-2 rounded-xl border border-navy-200 text-sm mt-1" /></div>
-              </div>
-              <Button variant="primary" onClick={analyze} disabled={!credentials.username || !credentials.password}>Verbinden & Analysieren</Button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={()=>setStep(2)}>Weiter →</Button>
+            <Button variant="secondary" size="sm" onClick={downloadTemplate}>📥 CSV-Vorlage herunterladen</Button>
+          </div>
         </Card>
       )}
 
-      {/* Step 2: Analysis */}
-      {step === 2 && (
+      {/* Step 2: Upload */}
+      {step===2 && (
         <Card className="p-6 space-y-4">
-          <h3 className="font-semibold text-navy-800">✅ Analyse abgeschlossen</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-navy-50 rounded-xl"><p className="text-2xl font-bold text-navy-900">{analysis.cases.toLocaleString()}</p><p className="text-xs text-navy-400">Akten</p></div>
-            <div className="text-center p-4 bg-navy-50 rounded-xl"><p className="text-2xl font-bold text-navy-900">{analysis.documents.toLocaleString()}</p><p className="text-xs text-navy-400">Dokumente</p></div>
-            <div className="text-center p-4 bg-navy-50 rounded-xl"><p className="text-2xl font-bold text-navy-900">{analysis.contacts}</p><p className="text-xs text-navy-400">Kontakte</p></div>
+          <h3 className="font-semibold text-navy-800">CSV-Datei hochladen</h3>
+          <div className="border-2 border-dashed border-navy-200 rounded-xl p-8 text-center">
+            <input type="file" accept=".csv,.txt" onChange={e=>{if(e.target.files?.[0])handleFile(e.target.files[0])}} className="hidden" id="csv-upload"/>
+            <label htmlFor="csv-upload" className="cursor-pointer">
+              <p className="text-4xl mb-2">📄</p>
+              <p className="text-navy-600">{file?file.name:'CSV-Datei auswählen'}</p>
+              <p className="text-xs text-navy-400 mt-1">Unterstützt: CSV (Komma- oder Semikolon-getrennt)</p>
+            </label>
           </div>
-          <p className="text-sm text-navy-500">Geschätzte Migrationsdauer: <strong>{analysis.estimatedMinutes} Minuten</strong></p>
-          <Button variant="primary" onClick={() => setStep(3)}>Weiter zum Feld-Mapping</Button>
+          <Button variant="secondary" size="sm" onClick={()=>setStep(1)}>← Zurück</Button>
         </Card>
       )}
 
       {/* Step 3: Mapping */}
-      {step === 3 && (
+      {step===3 && (
         <Card className="p-6 space-y-4">
-          <h3 className="font-semibold text-navy-800">Feld-Zuordnung</h3>
-          <p className="text-sm text-navy-400">Überprüfen und korrigieren Sie die automatische Zuordnung der Datenfelder.</p>
-          <div className="space-y-3">
-            {mapping.map((m, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 bg-navy-50 rounded-xl">
-                <span className="text-sm font-medium text-navy-700 w-40">{m.source}</span>
-                <span className="text-navy-300">→</span>
-                <select value={m.target} onChange={e => setMapping(prev => prev.map((p, j) => j === i ? { ...p, target: e.target.value } : p))}
-                  className={`flex-1 px-3 py-1.5 rounded-lg border text-sm ${m.auto && m.target ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-                  <option value="">— Bitte zuordnen —</option>
-                  {targetFields.map(f => <option key={f} value={f}>{f}</option>)}
+          <h3 className="font-semibold text-navy-800">Spalten zuordnen</h3>
+          <p className="text-xs text-navy-400">Erkannte Spalten: {csvHeaders.join(', ')} · {csvRows.length} Datensätze</p>
+          <div className="space-y-2">
+            {TARGET_FIELDS[target].map(f=>(
+              <div key={f.key} className="flex items-center gap-3">
+                <label className="w-40 text-sm text-navy-700">{f.label}{f.required?<span className="text-red-500"> *</span>:''}</label>
+                <select value={mapping.find(m=>m.db===f.key)?.csv||''} onChange={e=>setMapping(prev=>prev.map(m=>m.db===f.key?{...m,csv:e.target.value}:m))} className="flex-1 px-3 py-2 rounded-xl border border-navy-200 text-sm">
+                  <option value="">— nicht zuordnen —</option>
+                  {csvHeaders.map(h=><option key={h} value={h}>{h}</option>)}
                 </select>
-                {m.auto && m.target && <span className="text-emerald-500 text-xs">✓ Auto</span>}
               </div>
             ))}
           </div>
-          <Button variant="primary" onClick={startMigration}>Migration starten</Button>
+          {/* Preview */}
+          <div className="overflow-x-auto">
+            <p className="text-xs font-medium text-navy-500 mb-1">Vorschau (erste 5 Zeilen)</p>
+            <table className="w-full text-xs"><thead><tr>{csvHeaders.map(h=><th key={h} className="p-2 text-left bg-navy-50 text-navy-600">{h}</th>)}</tr></thead>
+              <tbody>{csvRows.slice(0,5).map((r,i)=><tr key={i} className="border-b border-navy-50">{r.map((c,j)=><td key={j} className="p-2 text-navy-700">{c}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={()=>setStep(4)}>Weiter →</Button>
+            <Button variant="secondary" size="sm" onClick={()=>setStep(2)}>← Zurück</Button>
+          </div>
         </Card>
       )}
 
-      {/* Step 4: Migration */}
-      {step === 4 && (
+      {/* Step 4: Confirm + Import */}
+      {step===4 && (
         <Card className="p-6 space-y-4">
-          <h3 className="font-semibold text-navy-800">{migrating ? '🔄 Migration läuft...' : '✅ Migration abgeschlossen'}</h3>
-          <div className="w-full h-4 bg-navy-100 rounded-full overflow-hidden">
-            <div className="h-full bg-gold-400 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          <h3 className="font-semibold text-navy-800">Import bestätigen</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-navy-50 rounded-xl"><p className="text-xs text-navy-400">Ziel</p><p className="font-medium text-navy-800">{TARGET_LABELS[target]}</p></div>
+            <div className="p-3 bg-navy-50 rounded-xl"><p className="text-xs text-navy-400">Datensätze</p><p className="font-medium text-navy-800">{csvRows.length}</p></div>
           </div>
-          <p className="text-sm text-navy-400 text-center">{progress}% — Migriere Daten...</p>
-        </Card>
-      )}
-
-      {/* Step 5: Report */}
-      {step === 5 && report && (
-        <Card className="p-6 space-y-4">
-          <h3 className="font-semibold text-navy-800">🎉 Migration erfolgreich!</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-emerald-50 rounded-xl"><p className="text-2xl font-bold text-emerald-700">{report.migrated.toLocaleString()}</p><p className="text-xs text-emerald-500">Migriert</p></div>
-            <div className="text-center p-4 bg-navy-50 rounded-xl"><p className="text-2xl font-bold text-navy-700">{report.total.toLocaleString()}</p><p className="text-xs text-navy-400">Gesamt</p></div>
-            <div className="text-center p-4 bg-red-50 rounded-xl"><p className="text-2xl font-bold text-red-600">{report.errors}</p><p className="text-xs text-red-400">Fehler</p></div>
-          </div>
-          {report.errorDetails.length > 0 && (
-            <div className="bg-amber-50 p-4 rounded-xl"><p className="text-sm font-medium text-amber-800 mb-2">Folgende Einträge erfordern manuelle Prüfung:</p>
-              <ul className="text-xs text-amber-600 space-y-1">{report.errorDetails.map((e, i) => <li key={i}>⚠️ {e}</li>)}</ul></div>
+          {importing && (
+            <div><div className="w-full bg-navy-100 rounded-full h-3"><div className="bg-gold-500 h-3 rounded-full transition-all" style={{width:progress+'%'}}/></div><p className="text-xs text-navy-500 text-center mt-1">{progress}%</p></div>
           )}
-          <p className="text-sm text-navy-500">Sie können die importierten Daten jetzt unter &quot;Digitale Akten&quot; einsehen.</p>
-          <Button variant="primary" onClick={() => window.location.href = '/anwalt/kanzlei/akten'}>Zu den Akten →</Button>
+          <div className="flex gap-2">
+            <Button variant="primary" size="sm" onClick={doImport} loading={importing} disabled={importing}>🚀 Import starten</Button>
+            {!importing && <Button variant="secondary" size="sm" onClick={()=>setStep(3)}>← Zurück</Button>}
+          </div>
+        </Card>
+      )}
+
+      {/* Step 5: Result */}
+      {step===5 && (
+        <Card className="p-6 space-y-4">
+          <h3 className="font-semibold text-navy-800">Import abgeschlossen</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-4 bg-green-50 rounded-xl"><p className="text-xs text-green-600">Erfolgreich</p><p className="text-2xl font-bold text-green-700">{result.success}</p></div>
+            <div className="p-4 bg-red-50 rounded-xl"><p className="text-xs text-red-600">Fehler</p><p className="text-2xl font-bold text-red-700">{result.errors.length}</p></div>
+          </div>
+          {result.errors.length>0 && (
+            <div className="max-h-40 overflow-y-auto bg-red-50 rounded-xl p-3 space-y-1">
+              {result.errors.map((e,i)=><p key={i} className="text-xs text-red-700">{e}</p>)}
+            </div>
+          )}
+          <Button variant="primary" size="sm" onClick={()=>{setStep(1);setCsvHeaders([]);setCsvRows([]);setFile(null);setResult({success:0,errors:[]})}}>Neuer Import</Button>
         </Card>
       )}
     </div>

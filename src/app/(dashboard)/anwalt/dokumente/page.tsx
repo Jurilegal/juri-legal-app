@@ -73,7 +73,7 @@ export default function DokumentePage() {
 
     const path = `documents/${user.id}/${docType}-${Date.now()}-${file.name}`
     const { error: uploadError } = await supabase.storage.from('lawyer-documents').upload(path, file)
-    if (uploadError) { alert('Upload fehlgeschlagen: ' + uploadError.message); setUploading(null); return }
+    if (uploadError) { console.error('Upload fehlgeschlagen:', uploadError.message); setUploading(null); return }
 
     await supabase.from('lawyer_documents').insert({
       user_id: user.id, document_type: docType, file_path: path, original_filename: file.name, status: 'pending_review',

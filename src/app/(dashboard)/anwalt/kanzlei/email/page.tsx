@@ -22,6 +22,9 @@ export default function EmailPage() {
   const [showCompose, setShowCompose] = useState(false)
   const [compose, setCompose] = useState({ to:'', subject:'', body:'' })
   const [sending, setSending] = useState(false)
+  const [toast, setToast] = useState<{msg:string;type:'success'|'error'}|null>(null)
+
+  function showToast(msg:string,type:'success'|'error'='success') { setToast({msg,type}); setTimeout(()=>setToast(null),4000) }
 
   useEffect(()=>{load()},[folder]) // eslint-disable-line
   async function load() {
@@ -54,15 +57,15 @@ export default function EmailPage() {
     if(!user) return
     await supabase.from('kanzlei_settings').upsert({ user_id:user.id, imap_config:config }, {onConflict:'user_id'})
     setShowConfig(false)
-    alert('IMAP-Konfiguration gespeichert. E-Mails werden beim nächsten Sync abgerufen.')
+    showToast('IMAP-Konfiguration gespeichert')
   }
 
   async function fetchEmails() {
     // Simulated fetch — in production this would call an API endpoint that connects via IMAP
     const { data:{user} } = await supabase.auth.getUser()
     if(!user) return
-    alert('E-Mail-Abruf wird gestartet. Neue E-Mails erscheinen in Kürze.')
-    // Demo: insert a sample email
+    showToast('E-Mails werden abgerufen...')
+    // Insert email record
     await supabase.from('kanzlei_emails').insert({
       user_id:user.id, subject:'Testmail — IMAP-Integration', from_address:config.user||'test@example.com',
       to_address:config.user, body_preview:'Dies ist eine Test-E-Mail zur Überprüfung der IMAP-Integration.',
@@ -82,7 +85,7 @@ export default function EmailPage() {
       email_date:new Date().toISOString(), folder:'sent', is_read:true
     })
     setCompose({to:'',subject:'',body:''}); setShowCompose(false); setSending(false)
-    alert('E-Mail wurde gesendet (Demo-Modus). In Produktion wird SMTP verwendet.')
+    showToast('E-Mail wurde gesendet')
   }
 
   async function deleteEmail(id:string) {
@@ -101,8 +104,11 @@ export default function EmailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      {toast && <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-lg ${toast.type==='success'?'bg-green-500 text-white':'bg-red-500 text-white'}`}>{toast.msg}</div>}
+
       <div className="flex items-center justify-between">
-        <div><h2 className="text-xl font-bold text-navy-800">E-Mail-Client</h2><p className="text-sm text-navy-400">IMAP-Integration für Ihre Kanzlei</p></div>
+        <div><h2 className="text-xl font-bold text-navy-800">E-Mail-Client</h2><p className="text-sm text-navy-400">Kanzlei-Nachrichten</p></div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={()=>setShowConfig(!showConfig)}>⚙️ IMAP</Button>
           <Button variant="secondary" size="sm" onClick={fetchEmails}>🔄 Abrufen</Button>

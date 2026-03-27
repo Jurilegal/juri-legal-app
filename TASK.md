@@ -1,217 +1,126 @@
-# Juri Legal - Build Task
+# NACHT-TASK: Juri Legal Modul-Vervollständigung
 
-## Overview
-Build a professional On-Demand lawyer platform (SaaS) using Next.js 15 App Router + Supabase + Tailwind CSS v4. The platform connects clients with lawyers on a per-minute billing basis.
+Arbeite diese Aufgaben in Reihenfolge ab. Ziel: Alle Module voll funktionsfähig + Dummy-Daten.
 
-## Corporate Identity (from juri-legal.com)
-- **Primary color:** Deep navy/dark blue (#1B2A4A or similar)
-- **Accent color:** Gold/amber (#D4A843 or similar)  
-- **Style:** Professional, trustworthy, modern legal platform
-- **Font:** Use Inter or similar modern sans-serif
-- **Language:** German (primary UI language)
-- **Brand name:** Juri Legal
+## Kontext
+- Next.js 15 + Supabase + Tailwind CSS v4
+- Projekt: /Users/annaweiss-ea/.openclaw/workspace/juri-legal/app/
+- DB: postgresql://postgres:Ay0TNIIG4QdygNuU@db.wpqamxodqbrpyvaybgrj.supabase.co:5432/postgres
+- psql: /opt/homebrew/Cellar/libpq/18.3/bin/psql
+- Anwalt User ID: 42849bd3-8bd4-4c6a-8d51-b3421b32fd61
+- Mandant User ID: b60ce5aa (check profiles table for full UUID)
+- Git push pattern: git add -A && git commit -m "msg" && git push && git checkout design-b && git merge main -m "merge: desc" && git push && git checkout main
 
-## Tech Stack
-- Next.js 15+ (App Router, TypeScript, `src/` directory)
-- Supabase (Auth, PostgreSQL with RLS, Storage, Realtime)
-- Tailwind CSS v4 (already installed)
-- @supabase/supabase-js + @supabase/ssr
+## Phase 1: Fix broken modules
 
-## Environment Variables (already set)
-```
-NEXT_PUBLIC_SUPABASE_URL=https://wpqamxodqbrpyvaybgrj.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbG...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
-```
+### 1. KI-Assistent (src/app/(dashboard)/anwalt/kanzlei/ki/page.tsx)
+- Build offline-smart KI assistant that works WITHOUT API key
+- Template-based responses for common legal queries (Fristen, RVG, Schriftsatz-Muster)
+- When GROQ_API_KEY is set in env, use it via /api/anwalt/ki-assistant route
+- Update /api/anwalt/ki-assistant/route.ts to support Groq (https://api.groq.com/openai/v1/chat/completions, model: llama-3.3-70b-versatile)
+- Chat history in DB table ki_chat_history (create it via psql)
+- 10 Vorlagen, Akte-Kontext auswählbar, "Als Notiz speichern" Button
+- Markdown rendering for responses
 
-## What to Build
+### 2. E-Mail-Client (src/app/(dashboard)/anwalt/kanzlei/email/page.tsx)  
+- Remove ALL alert() → inline success/error banners (green/red div that auto-fades)
+- Remove "Demo-Modus" text everywhere
+- fetchEmails: generate 5-8 realistic emails in DB from courts/mandanten/gegner
+- Send: just INSERT into DB, show inline confirmation
+- Add attachment_path column to kanzlei_emails (psql)
 
-### 1. Supabase Client Setup
-- Create `src/lib/supabase/client.ts` (browser client)
-- Create `src/lib/supabase/server.ts` (server client with cookies)
-- Create `src/lib/supabase/middleware.ts` (auth middleware)
-- Install: `npm install @supabase/supabase-js @supabase/ssr`
+### 3. DATEV-Export (src/app/(dashboard)/anwalt/kanzlei/datev/page.tsx)
+- Complete rewrite (currently 40 lines)
+- Date range selector, export type selector
+- Load real data from kanzlei_invoices, fibu_entries, invoice_payments
+- Generate DATEV-CSV format (semicolon separated, German numbers)
+- Preview table + download button
 
-### 2. Database Schema (via Supabase SQL)
-Create a file `supabase/schema.sql` with ALL tables:
+### 4. Recherche (src/app/(dashboard)/anwalt/kanzlei/recherche/page.tsx)
+- Remove ALL mock/demo data
+- Search over knowledge_base + case_notes from DB
+- Law reference generator: parse "§ 823 BGB" → link to gesetze-im-internet.de
+- Save search queries in legal_research_queries
+- "Zur Akte hinzufügen" button
 
-```sql
--- Enable RLS
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+### 5. Dokument-Viewer (src/app/(dashboard)/anwalt/kanzlei/dokument-viewer/page.tsx)
+- Load documents from case_documents
+- Create signed URLs from Supabase Storage
+- PDF preview in iframe, images in img tag
+- Split layout: list left, preview right
+- Download button, "Zur Akte" link
 
--- User profiles (extends Supabase auth.users)
-CREATE TYPE user_role AS ENUM ('mandant', 'anwalt', 'admin');
-CREATE TYPE verification_status AS ENUM ('pending', 'approved', 'rejected');
-CREATE TYPE document_type AS ENUM ('anwaltszulassung', 'identitaetsnachweis');
-CREATE TYPE document_status AS ENUM ('pending_review', 'approved', 'rejected');
+### 6. Vorlagen (src/app/(dashboard)/anwalt/kanzlei/vorlagen/page.tsx)
+- Remove "wird ergänzt" placeholders
+- Define 9 placeholders: MANDANT_NAME, MANDANT_ADRESSE, GEGNER_NAME, AKTENZEICHEN, DATUM, GERICHT, KANZLEI_NAME, KANZLEI_ADRESSE, ANWALT_NAME
+- Placeholder click-to-insert in editor
+- Live preview with replaced placeholders from selected case
+- Generate document from template + case → download
 
-CREATE TABLE profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  role user_role NOT NULL DEFAULT 'mandant',
-  first_name VARCHAR(100),
-  last_name VARCHAR(100),
-  email VARCHAR(256) NOT NULL,
-  phone VARCHAR(50),
-  avatar_url TEXT,
-  is_profile_complete BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+### 7. beA-Postfach (src/app/(dashboard)/anwalt/kanzlei/bea/page.tsx)
+- Load messages from bea_messages DB table
+- Compose + send (INSERT into DB)
+- Inbox/Outbox/Drafts tabs
+- Mark as read
+- Link to case (case_id)
 
-CREATE TABLE lawyer_profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  headline VARCHAR(255),
-  bio TEXT,
-  city VARCHAR(100),
-  minute_rate DECIMAL(10,2) DEFAULT 2.99,
-  specializations JSONB DEFAULT '[]',
-  languages JSONB DEFAULT '["Deutsch"]',
-  experience_years INTEGER,
-  verification_status verification_status DEFAULT 'pending',
-  is_available BOOLEAN DEFAULT FALSE,
-  rating DECIMAL(3,2) DEFAULT 0,
-  total_reviews INTEGER DEFAULT 0,
-  total_consultations INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+### 8. Migration (src/app/(dashboard)/anwalt/migration/page.tsx)
+- Real CSV upload (file input)
+- CSV parsing in browser
+- Column mapping UI
+- Import into: cases, kanzlei_contacts, kanzlei_clients
+- Preview first 5 rows
+- Progress indicator
+- Template CSV download
 
-CREATE TABLE lawyer_documents (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  document_type document_type NOT NULL,
-  file_path TEXT NOT NULL,
-  original_filename TEXT NOT NULL,
-  status document_status DEFAULT 'pending_review',
-  rejection_reason TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+### 9. Mandant Zahlungen (src/app/(dashboard)/mandant/zahlungen/page.tsx)
+- Connect to Supabase: load from session_payments, juri_coin_ledger
+- Remove alert()
+- Payment history list
+- Filter by time period
+- Summary cards (total spent, this month)
 
--- RLS Policies
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE lawyer_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE lawyer_documents ENABLE ROW LEVEL SECURITY;
+### 10. Mandant Coins (src/app/(dashboard)/mandant/coins/page.tsx)
+- Remove alert() → inline feedback
+- Load balance from juri_coin_ledger
+- Package selection (10€, 25€, 50€, 100€)
+- Transaction history from DB
 
--- Profiles: users can read their own, anyone can read lawyer profiles
-CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Public can view profiles" ON profiles FOR SELECT USING (true);
+### 11. Replace ALL alert() in entire codebase
+- Find all alert() calls in src/app/ and replace with inline UI feedback
 
--- Lawyer profiles: public read, owner write
-CREATE POLICY "Public can view lawyer profiles" ON lawyer_profiles FOR SELECT USING (true);
-CREATE POLICY "Lawyers can update own profile" ON lawyer_profiles FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Lawyers can insert own profile" ON lawyer_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+## Phase 2: Dummy Data (via psql)
+Insert 10-15 realistic German dummy records per module for anwalt user 42849bd3-8bd4-4c6a-8d51-b3421b32fd61:
+- 12 cases (diverse Rechtsgebiete, statuses, with sub-cases)
+- 15 contacts (all 7 types)
+- 10 kanzlei_clients 
+- 12 deadlines (3 overdue, 4 upcoming, 5 done)
+- 15 time_entries
+- 10 invoices (different statuses) + 5 payments
+- 12 case_notes
+- 10 calendar_events
+- 10 text_snippets
+- 8 knowledge_base entries
+- 12 fibu_entries
+- 10 kanzlei_emails
+- 5 dunning_processes
+- 5 bea_messages
+- 8 document_templates
+- 5 case_templates
+- 6 wiedervorlagen (deadlines with type=wiedervorlage)
+- 4 workflow_templates
+- 5 claims/forderungen
+- 1 complete kanzlei_settings record
+- For mandant: 5 beratungen, 5 reviews, coin balance, 6 payments
 
--- Documents: owner only
-CREATE POLICY "Users can view own documents" ON lawyer_documents FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can upload documents" ON lawyer_documents FOR INSERT WITH CHECK (auth.uid() = user_id);
+## Phase 3: Build + Push
+- npm run build (must pass with 0 errors)  
+- Push to main + design-b
+- Clean up test files (qa-test.cjs etc)
 
--- Trigger for auto-creating profile on signup
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO profiles (id, email, role, first_name, last_name)
-  VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'mandant'),
-    NEW.raw_user_meta_data->>'first_name',
-    NEW.raw_user_meta_data->>'last_name'
-  );
-  
-  -- If lawyer, also create lawyer_profile
-  IF (NEW.raw_user_meta_data->>'role') = 'anwalt' THEN
-    INSERT INTO lawyer_profiles (user_id) VALUES (NEW.id);
-  END IF;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
-```
-
-### 3. Auth Pages (German UI)
-All pages must look STUNNING and professional. Use the navy/gold color scheme.
-
-- `src/app/(auth)/login/page.tsx` - Login with email/password
-- `src/app/(auth)/register/page.tsx` - Registration choice (Mandant or Anwalt)
-- `src/app/(auth)/register/mandant/page.tsx` - Client registration
-- `src/app/(auth)/register/anwalt/page.tsx` - Lawyer registration (more fields)
-- `src/app/(auth)/verify-email/page.tsx` - Email verification page
-- `src/app/(auth)/layout.tsx` - Auth layout (centered card, logo, branding)
-
-Registration fields for Anwalt:
-- Vorname, Nachname, Email, Passwort (min 12 chars, 1 upper, 1 lower, 1 number, 1 special), AGB checkbox
-
-Registration fields for Mandant:
-- Vorname, Nachname, Email, Passwort, AGB checkbox
-
-### 4. Middleware & Route Protection
-- `src/middleware.ts` - Protect dashboard routes, redirect unauthenticated users
-- Protected routes: `/dashboard/*`, `/anwalt/*`, `/mandant/*`, `/admin/*`
-- Public routes: `/`, `/login`, `/register/*`, `/anwaelte/*`, `/verify-email`
-
-### 5. Dashboard Pages
-- `src/app/(dashboard)/layout.tsx` - Dashboard layout with sidebar
-- `src/app/(dashboard)/anwalt/dashboard/page.tsx` - Lawyer dashboard
-- `src/app/(dashboard)/anwalt/profil/page.tsx` - Lawyer profile editor
-- `src/app/(dashboard)/mandant/dashboard/page.tsx` - Client dashboard
-- `src/app/(dashboard)/admin/dashboard/page.tsx` - Admin dashboard
-- `src/app/(dashboard)/admin/verifizierung/page.tsx` - Admin verification queue
-
-### 6. Landing Page (CRITICAL - Must be 10M€ quality)
-`src/app/page.tsx` - The main landing page must be SPECTACULAR:
-
-- **Hero section:** Bold headline "Sofortige Rechtsberatung. Per Minute." with CTA buttons
-- **How it works:** 3-step process (Anwalt finden → Beratung starten → Per Minute bezahlen)
-- **Benefits section:** Why Juri Legal (transparent pricing, verified lawyers, instant access)
-- **Lawyer showcase:** Featured lawyers with ratings and specializations
-- **Pricing section:** Clear per-minute pricing model
-- **Trust signals:** Security badges, encryption, Datenschutz
-- **FAQ section:** Common questions
-- **Footer:** Links, legal, social media
-- Use smooth animations, gradients, glass-morphism effects
-- Must be fully responsive (mobile-first)
-
-### 7. Public Lawyer Directory
-- `src/app/anwaelte/page.tsx` - Searchable lawyer directory with filters
-- `src/app/anwaelte/[id]/page.tsx` - Public lawyer profile page
-- Filters: Fachgebiet, Stadt, Preis, Verfügbarkeit, Bewertung
-
-### 8. Shared Components
-Create in `src/components/`:
-- `ui/Button.tsx` - Primary, secondary, outline variants
-- `ui/Input.tsx` - Form input with label and error
-- `ui/Card.tsx` - Card component
-- `ui/Badge.tsx` - Status badges
-- `ui/Avatar.tsx` - User avatar
-- `layout/Navbar.tsx` - Main navigation (responsive)
-- `layout/Footer.tsx` - Site footer
-- `layout/Sidebar.tsx` - Dashboard sidebar
-- `layout/Logo.tsx` - Juri Legal logo (SVG or text-based)
-
-### 9. Important Notes
-- ALL text in German
-- Use TypeScript strictly (no `any`)
-- Use Server Components where possible, Client Components only when needed
-- Every page must be production-quality design
-- Mobile-responsive everything
-- Use Supabase Auth (email/password) — NOT custom JWT
-- Do NOT use any external UI libraries (no shadcn, no MUI) — build everything with Tailwind
-- The design must match a 10M€ investment startup look
-- Use proper SEO meta tags on all public pages
-- Implement proper error handling and loading states
-
-### 10. After Building
-1. Run `npm run build` to verify no errors
-2. Commit all changes
-3. Push to GitHub (the Vercel deploy is automatic)
-
-Git remote is already configured (see .git/config)
-
-When completely finished, run this command to notify me:
-openclaw system event --text "Done: Built Juri Legal app - Auth, Landing Page, Lawyer Directory, Dashboards all complete and deployed" --mode now
+## IMPORTANT
+- All UI text in GERMAN
+- Use Tailwind classes consistent with existing code (navy-*, gold-*)
+- All new tables need RLS enabled
+- Commit after each major module fix
+- German date format (dd.MM.yyyy), German currency (€)
