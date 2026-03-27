@@ -47,7 +47,7 @@ export function Sidebar({ items, role, open, onClose }: { items: NavItem[]; role
 
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin">
           {items.map(item => {
-            const active = pathname === item.href
+            const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/')) || (item.href !== '/' && pathname.startsWith(item.href + '?'))
             return (
               <Link
                 key={item.href}
